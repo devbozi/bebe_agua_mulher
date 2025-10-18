@@ -1,16 +1,28 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/material.dart';
+import 'package:timezone/timezone.dart' as tz;
+import 'package:timezone/data/latest.dart' as tz_data;
 import '../models/hydration_settings.dart';
 import '../theme/app_theme.dart';
+
+// Alias para TZDateTime para facilitar o uso
+typedef TZDateTime = tz.TZDateTime;
 
 class NotificationService {
   static final FlutterLocalNotificationsPlugin _notifications =
       FlutterLocalNotificationsPlugin();
+      
+  // Fuso horário local para agendamento de notificações
+  static late final tz.Location local;
 
   static bool _initialized = false;
 
   static Future<void> initialize() async {
     if (_initialized) return;
+    
+    // Inicializar timezone
+    tz_data.initializeTimeZones();
+    local = tz.local;
 
     const AndroidInitializationSettings androidSettings =
         AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -105,11 +117,16 @@ class NotificationService {
       iOS: iosDetails,
     );
 
-    await _notifications.show(
+    // Usando zonedSchedule em vez de show para permitir notificações em segundo plano
+    await _notifications.zonedSchedule(
       id,
       'Hora de se hidratar! 💧',
       message,
+      TZDateTime.from(scheduledTime, local),
       details,
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      uiLocalNotificationDateInterpretation: 
+          UILocalNotificationDateInterpretation.absoluteTime,
     );
   }
 
@@ -138,11 +155,17 @@ class NotificationService {
       iOS: iosDetails,
     );
 
-    await _notifications.show(
+    // Usando zonedSchedule com tempo atual para notificação imediata
+    final now = TZDateTime.now(local);
+    await _notifications.zonedSchedule(
       DateTime.now().millisecondsSinceEpoch ~/ 1000,
       'Hora de se hidratar! 💧',
       message,
+      now,
       details,
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      uiLocalNotificationDateInterpretation: 
+          UILocalNotificationDateInterpretation.absoluteTime,
     );
   }
 
